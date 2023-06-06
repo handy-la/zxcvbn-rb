@@ -1,10 +1,12 @@
 # frozen_string_literal: true
 
+require 'i18n'
+
 module Zxcvbn
   module Feedback
     DEFAULT_FEEDBACK = {
       "warning" => "",
-      "suggestions" => ["Use a few words, avoid common phrases", "No need for symbols, digits, or uppercase letters"]
+      "suggestions" => [:few_words, :avoid_common_phrases, :no_need_symbols]
     }.freeze
 
     def self.get_feedback(score, sequence)
@@ -23,7 +25,7 @@ module Zxcvbn
 
       longest_match = sequence.max_by { |match| match["token"].length }
       feedback = get_match_feedback(longest_match, sequence.size == 1)
-      extra_feedback = "Add another word or two. Uncommon words are better."
+      extra_feedback = :add_another_word
       if feedback
         feedback["suggestions"].unshift(extra_feedback)
         feedback["warning"] = "" if feedback["warning"].nil?
@@ -42,41 +44,41 @@ module Zxcvbn
         get_dictionary_match_feedback(match, is_sole_match)
       when "spatial"
         warning = if match["turns"] == 1
-          "Straight rows of keys are easy to guess"
+          :straight_rows_easy_guess
         else
-          "Short keyboard patterns are easy to guess"
+          :short_keyboard_patterns_easy_guess
         end
         {
           "warning" => warning,
-          "suggestions" => ["Use a longer keyboard pattern with more turns"]
+          "suggestions" => [:use_longer_keyboard_pattern]
         }
       when "repeat"
         warning = if match["base_token"].length == 1
-          'Repeats like "aaa" are easy to guess'
+          :repeats_easy_guess
         else
-          'Repeats like "abcabcabc" are only slightly harder to guess than "abc"'
+          :repeats_slightly_harder_guess
         end
         {
           "warning" => warning,
-          "suggestions" => ["Avoid repeated words and characters"]
+          "suggestions" => [:avoid_repeated_words]
         }
       when "sequence"
         {
-          "warning" => "Sequences like abc or 6543 are easy to guess",
-          "suggestions" => ["Avoid sequences"]
+          "warning" => :sequences_easy_guess,
+          "suggestions" => [:avoid_sequences]
         }
       when "regex"
         if match["regex_name"] == "recent_year"
           {
-            "warning" => "Recent years are easy to guess",
-            "suggestions" => ["Avoid recent years", "Avoid years that are associated with you"]
+            "warning" => :recent_years_easy_guess,
+            "suggestions" => [:avoid_recent_years, :avoid_associated_years]
           }
         end
         # break
       when "date"
         {
-          "warning" => "Dates are often easy to guess",
-          "suggestions" => ["Avoid dates and years that are associated with you"]
+          "warning" => :dates_easy_guess,
+          "suggestions" => [:avoid_dates_associated_years]
         }
       end
     end
@@ -85,22 +87,22 @@ module Zxcvbn
       warning = if match["dictionary_name"] == "passwords"
         if is_sole_match && !match["l33t"] && !match["reversed"]
           if match["rank"] <= 10
-            "This is a top-10 common password"
+            :top_10_common_password
           elsif match["rank"] <= 100
-            "This is a top-100 common password"
+            :top_100_common_password
           else
-            "This is a very common password"
+            :very_common_password
           end
         elsif match["guesses_log10"] <= 4
-          "This is similar to a commonly used password"
+          :similar_to_common_password
         end
       elsif match["dictionary_name"] == "english_wikipedia"
-        "A word by itself is easy to guess" if is_sole_match
+        :word_by_itself_easy_guess if is_sole_match
       elsif ["surnames", "male_names", "female_names"].include?(match["dictionary_name"])
         if is_sole_match
-          "Names and surnames by themselves are easy to guess"
+          :names_surnames_by_themselves_easy_guess
         else
-          "Common names and surnames are easy to guess"
+          :common_names_surnames_easy_guess
         end
       else
         ""
@@ -108,12 +110,12 @@ module Zxcvbn
       suggestions = []
       word = match["token"]
       if word.match(Scoring::START_UPPER)
-        suggestions << "Capitalization doesn't help very much"
+        suggestions << :capitalization_not_help_much
       elsif word.match(Scoring::ALL_UPPER) && word.downcase != word
-        suggestions << "All-uppercase is almost as easy to guess as all-lowercase"
+        suggestions << :all_uppercase_almost_easy_guess
       end
-      suggestions << "Reversed words aren't much harder to guess" if match["reversed"] && match["token"].length >= 4
-      suggestions << "Predictable substitutions like '@' instead of 'a' don't help very much" if match["l33t"]
+      suggestions << :reversed_words_not_much_harder_guess if match["reversed"] && match["token"].length >= 4
+      suggestions << :predictable_substitutions_not_help_much if match["l33t"]
       {
         "warning" => warning,
         "suggestions" => suggestions
